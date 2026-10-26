@@ -59,6 +59,17 @@ header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-con
 .seg button{border:0;background:transparent;padding:5px 10px;font-size:12px}
 .seg button[aria-pressed="true"]{background:var(--ai);color:var(--surface)}
 #map{width:100%;height:auto;display:block;background:var(--bg);border-radius:8px;touch-action:manipulation}
+#lmap{width:100%;height:540px;border-radius:8px;background:var(--bg);z-index:0}
+@media (max-width:600px){#lmap{height:420px}}
+.pin{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:600 12px/1 var(--body);color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.pin.off{background:#fff;color:#24346b;border-color:#24346b}
+.pin.hot{border-radius:6px;background:#b8892a}
+.pin.hot.off{background:#fff;color:#b8892a;border-color:#b8892a}
+.leaflet-popup-content{font-family:var(--body);font-size:13px;line-height:1.5;margin:10px 12px}
+.leaflet-popup-content b{font-size:14px}
+.pop-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pop-links a{border:1px solid #d9dce6;border-radius:5px;padding:2px 7px;text-decoration:none;color:#24346b}
+.mapnote{font-size:12px;border-radius:6px;padding:8px 10px;margin-top:8px;background:var(--gold-soft)}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin-top:8px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .sw{width:14px;height:3px;border-radius:2px;display:inline-block}
@@ -142,9 +153,11 @@ footer li{overflow-wrap:anywhere}
           <button type="button" data-zoom="city" aria-pressed="false">시내 중심</button>
         </div>
       </div>
-      <svg id="map" role="img" aria-label="관광지와 숙소 좌표 지도"></svg>
+      <div id="lmap" aria-label="관광지와 숙소 지도"></div>
+      <svg id="map" role="img" aria-label="관광지와 숙소 좌표 지도" hidden></svg>
       <div class="legend" id="legend"></div>
-      <p class="muted" style="font-size:12px;margin:8px 0 0">실제 위도·경도로 배치한 좌표 지도입니다. 지점을 누르면 카드로 이동하고, 각 카드의 <b>구글지도·네이버지도</b> 버튼과 일정의 <b>경로 열기</b>로 실제 지도와 대중교통 경로를 확인할 수 있습니다.</p>
+      <div class="mapnote" id="mapNote" hidden>이 화면에서는 보안 정책 때문에 지도 이미지를 불러올 수 없어서, 실제 위도·경도로 배치한 좌표 지도로 표시합니다. <b>다운로드한 HTML 파일</b>을 브라우저로 열면 실제 지도가 나옵니다. 각 카드의 구글지도·네이버지도 버튼과 일정의 <b>경로 열기</b>로도 실제 지도를 볼 수 있습니다.</div>
+      <p class="muted" id="mapHelp" style="font-size:12px;margin:8px 0 0">번호는 일정 순서, 색은 날짜입니다. 핀을 누르면 요금과 지도·사진 링크가 나옵니다. 지도 © OpenStreetMap 기여자, © CARTO</p>
     </section>
 
     <section class="panel" aria-label="일정 편집">
@@ -179,6 +192,8 @@ footer li{overflow-wrap:anywhere}
 </div>
 <div class="toast" id="toast" hidden></div>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const S = {
   city:{t:"名古屋市 사용료 개정 안내(PDF)",u:"https://www.city.nagoya.jp/_res/projects/default_project/_page_/001/017/533/2605_shiban_05.pdf"},
@@ -322,7 +337,64 @@ function viewBox(){
   if(zoom==="all")return [0,0,W,H];
   const [x0,y0]=px(35.198,136.865),[x1,y1]=px(35.122,136.945);return [x0,y0,x1-x0,y1-y0];
 }
+/* ---- real map (Leaflet + OSM/CARTO tiles), falls back to the coordinate SVG ---- */
+let mapMode = (typeof L!=="undefined") ? "leaflet" : "svg", lmap=null, lLayer=null;
+const CITY_B=[[35.122,136.865],[35.198,136.945]], ALL_B=[[35.02,136.66],[35.40,137.11]];
+let svgShown=false;
+function fallbackToSvg(){
+  if(svgShown)return; svgShown=true;
+  mapMode="svg";
+  try{if(lmap){lmap.remove();lmap=null}}catch(e){}
+  $("#lmap").hidden=true;$("#map").hidden=false;$("#mapNote").hidden=false;$("#mapHelp").hidden=true;
+  renderMap();
+}
+function initLeaflet(){
+  try{
+    lmap=L.map("lmap",{scrollWheelZoom:false,zoomSnap:.5});
+    lmap.fitBounds(ALL_B);
+    let loaded=false;
+    const tiles=L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'}).addTo(lmap);
+    let errs=0;
+    tiles.on("tileload",()=>{loaded=true});
+    tiles.on("tileerror",()=>{errs++;if(!loaded&&errs>=4)fallbackToSvg()});
+    setTimeout(()=>{if(!loaded)fallbackToSvg()},6000);
+    lLayer=L.layerGroup().addTo(lmap);
+  }catch(e){fallbackToSvg()}
+}
+function pinIcon(html,cls,color){return L.divIcon({className:"",html:`<div class="pin ${cls}" style="${color?`background:${color}`:""}">${html}</div>`,iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-12]})}
+function popHtml(o,kind){
+  const fee=kind==="spot"?(o.fee?yen(o.fee)+" · ":"")+esc(o.feeLabel):esc(o.priceLabel);
+  return `<b>${esc(o.name)}</b><br><span style="color:#5d6479">${esc(o.ja)}</span><br>${fee}${kind==="hotel"?"<br>♨ "+esc(o.onsen):""}
+  <div class="pop-links"><a href="${gmaps(o.ja)}" target="_blank" rel="noopener">구글지도</a><a href="${nmaps(o.ja)}" target="_blank" rel="noopener">네이버지도</a><a href="${gimg(o.ja)}" target="_blank" rel="noopener">사진</a><a href="#${kind==="hotel"?"h-":"s-"}${o.id}" data-card="${kind==="hotel"?"h-":"s-"}${o.id}">카드 보기</a></div>`;
+}
+function renderLeaflet(){
+  lLayer.clearLayers();
+  plan.days.forEach((d,i)=>{
+    const pts=[];
+    if(i>0&&plan.days[i-1].hotel){const h=hotel(plan.days[i-1].hotel);pts.push([h.lat,h.lng])}
+    d.spots.forEach(id=>{const s=spot(id);pts.push([s.lat,s.lng])});
+    if(d.hotel){const h=hotel(d.hotel);pts.push([h.lat,h.lng])}
+    if(pts.length>1)L.polyline(pts,{color:cssVar(DAY_COLORS[i]),weight:i===activeDay?5:3,opacity:i===activeDay?.95:.5,dashArray:i===activeDay?null:"6 6"}).addTo(lLayer);
+  });
+  HOTELS.forEach(h=>{const used=plan.days.some(d=>d.hotel===h.id);
+    L.marker([h.lat,h.lng],{icon:pinIcon("♨","hot"+(used?"":" off")),zIndexOffset:used?500:0,title:h.name}).bindPopup(popHtml(h,"hotel")).addTo(lLayer)});
+  SPOTS.forEach(s=>{let di=-1,ord=0;plan.days.forEach((d,i)=>{const k=d.spots.indexOf(s.id);if(k>-1&&di<0){di=i;ord=k+1}});
+    const m=L.marker([s.lat,s.lng],{icon:pinIcon(di>-1?ord:"·",di>-1?"":"off",di>-1?cssVar(DAY_COLORS[di]):null),zIndexOffset:di>-1?1000:0,title:s.name}).bindPopup(popHtml(s,"spot"));
+    m.bindTooltip(s.name,{direction:"right",offset:[12,0],permanent:false});
+    m.addTo(lLayer)});
+}
+document.addEventListener("click",e=>{const a=e.target.closest("[data-card]");if(!a)return;e.preventDefault();const t=document.getElementById(a.dataset.card);if(t){t.scrollIntoView({behavior:"smooth",block:"center"});t.classList.add("sel");setTimeout(()=>t.classList.remove("sel"),1600)}});
 function renderMap(){
+  renderLegend();
+  if(mapMode==="leaflet"){if(!lmap)initLeaflet();if(lmap){renderLeaflet();return}}
+  renderSvg();
+}
+function setZoom(z){zoom=z;if(mapMode==="leaflet"&&lmap){lmap.fitBounds(z==="city"?CITY_B:ALL_B)}else renderMap()}
+function renderLegend(){
+  $("#legend").innerHTML=plan.days.map((d,i)=>`<span><i class="sw" style="background:var(${DAY_COLORS[i]})"></i>Day ${i+1}</span>`).join("")+`<span><i class="dot" style="border:2px solid var(--gold)"></i>온천 숙소</span><span><i class="dot" style="border:2px solid var(--ink)"></i>일정에 없는 곳</span>`;
+}
+function renderSvg(){
   const vb=viewBox(), fs=vb[2]/48, r=vb[2]/90, svg=$("#map");
   svg.setAttribute("viewBox",vb.join(" "));
   const ink=cssVar("--ink"),muted=cssVar("--muted"),line=cssVar("--line"),surf=cssVar("--surface"),gold=cssVar("--gold");
@@ -349,7 +421,7 @@ function renderMap(){
     g+=`<g class="pt" data-kind="spot" data-id="${s.id}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(s.name)}"><circle cx="${x}" cy="${y}" r="${r}" fill="${c}" stroke="${di>-1?c:ink}" stroke-width="${r*.25}"/>${di>-1?`<text x="${x}" y="${y+r*.4}" text-anchor="middle" font-size="${r*1.1}" fill="${surf}" font-weight="600">${ord}</text>`:""}<text x="${x+r*1.4}" y="${y+fs*.35}" font-size="${fs*.8}" fill="${ink}" font-weight="${di>-1?600:400}" paint-order="stroke" stroke="${cssVar("--bg")}" stroke-width="${fs*.25}">${esc(s.name)}</text></g>`});
   svg.innerHTML=g;
   svg.querySelectorAll(".pt").forEach(el=>{const go=()=>{const t=document.getElementById((el.dataset.kind==="hotel"?"h-":"s-")+el.dataset.id);if(t){t.scrollIntoView({behavior:"smooth",block:"center"});t.classList.add("sel");setTimeout(()=>t.classList.remove("sel"),1600)}};el.addEventListener("click",go);el.addEventListener("keydown",e=>{if(e.key==="Enter")go()})});
-  $("#legend").innerHTML=plan.days.map((d,i)=>`<span><i class="sw" style="background:var(${DAY_COLORS[i]})"></i>Day ${i+1}</span>`).join("")+`<span><i class="dot" style="border:2px solid var(--gold)"></i>온천 숙소</span><span><i class="dot" style="border:2px solid var(--ink)"></i>일정에 없는 곳</span><span><i class="dot" style="background:var(--muted);border-radius:1px;transform:rotate(45deg) scale(.8)"></i>주요 역</span>`;
+  $("#legend").insertAdjacentHTML("beforeend",`<span><i class="dot" style="background:var(--muted);border-radius:1px;transform:rotate(45deg) scale(.8)"></i>주요 역</span>`);
 }
 
 /* ---- day panel ---- */
@@ -425,7 +497,8 @@ function renderSummary(){
 function renderSources(){$("#srcList").innerHTML=Object.values(S).map(s=>`<li><a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a></li>`).join("")}
 function renderAll(){renderTabs();renderDay();renderMap();renderSpots();renderHotels();renderSummary()}
 
-document.querySelectorAll("[data-zoom]").forEach(b=>b.onclick=()=>{zoom=b.dataset.zoom;document.querySelectorAll("[data-zoom]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderMap()});
+document.querySelectorAll("[data-zoom]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-zoom]").forEach(x=>x.setAttribute("aria-pressed",x===b));setZoom(b.dataset.zoom)});
+if(mapMode==="svg")fallbackToSvg();
 ["persons","rateJPY","rateUSD","startDate"].forEach(id=>$("#"+id).addEventListener("input",()=>{saveSettings();renderAll()}));
 $("#resetBtn").onclick=()=>{plan=JSON.parse(JSON.stringify(DEFAULT_PLAN));save();renderAll();toast("추천 일정으로 되돌렸습니다")};
 try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",renderMap)}catch(e){}
