@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>나고야 3박4일 플래너</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 상단 요약 → [지도 | 일정 편집기] 2단 → 관광지·숙소 카드 → 출처. 쪽빛(아이이로) 바탕에 나고야성 금샤치 금색을 포인트로. */
+:root{
+  --bg:#f3f4f7; --surface:#ffffff; --ink:#1b2033; --muted:#5d6479; --line:#d9dce6;
+  --ai:#24346b; --gold:#b8892a; --gold-soft:#f5ead2; --good:#2f7a4f; --warn:#a2541d;
+  --d1:#24346b; --d2:#b8892a; --d3:#2f7a6f; --d4:#a2415a;
+  --display:"Gowun Batang", "Noto Serif KR", serif;
+  --body:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151f; --surface:#1b2030; --ink:#e8eaf2; --muted:#9aa1b6; --line:#2e3448;
+  --ai:#8ea3e8; --gold:#e0b55a; --gold-soft:#3a3120; --good:#6cc493; --warn:#e39a62;
+  --d1:#8ea3e8; --d2:#e0b55a; --d3:#5fc4b2; --d4:#e8819a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151f; --surface:#1b2030; --ink:#e8eaf2; --muted:#9aa1b6; --line:#2e3448;
+  --ai:#8ea3e8; --gold:#e0b55a; --gold-soft:#3a3120; --good:#6cc493; --warn:#e39a62;
+  --d1:#8ea3e8; --d2:#e0b55a; --d3:#5fc4b2; --d4:#e8819a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:28px;color:var(--ai)}
+h2{font-size:20px}
+h3{font-size:16px}
+a{color:var(--ai)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.ctl{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.ctl input,.ctl select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:96px}
+.ctl input[type=date]{width:auto}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px}
+.btn:hover{border-color:var(--ai)}
+.btn.primary{background:var(--ai);border-color:var(--ai);color:var(--surface)}
+
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.summary div{background:var(--surface);padding:12px 14px}
+.summary b{display:block;font-size:22px;font-family:var(--mono);font-weight:500}
+.summary .total b{color:var(--gold)}
+
+.main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px}
+@media (max-width:900px){.main{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:5px 10px;font-size:12px}
+.seg button[aria-pressed="true"]{background:var(--ai);color:var(--surface)}
+#map{width:100%;height:auto;display:block;background:var(--bg);border-radius:8px;touch-action:manipulation}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:14px;height:3px;border-radius:2px;display:inline-block}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+.daytabs{display:flex;gap:6px;flex-wrap:wrap}
+.daytabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.daytabs button[aria-selected="true"]{border-color:currentColor;font-weight:600}
+.dayinfo{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.stop{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px}
+.stop .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--surface);font-size:12px;font-weight:600}
+.stop .t{min-width:0}
+.stop .t b{display:block}
+.stop .t small{color:var(--muted)}
+.stop .acts{display:flex;gap:2px}
+.stop .acts button{border:1px solid var(--line);background:transparent;border-radius:5px;width:28px;height:28px;font-size:13px;line-height:1}
+.empty{border:1px dashed var(--line);border-radius:8px;padding:14px;color:var(--muted);text-align:center}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;max-width:100%}
+.note{background:var(--gold-soft);border-radius:8px;padding:10px 12px;font-size:13px}
+.daycost{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;font-size:13px}
+
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.card .ja{font-size:12px;color:var(--muted)}
+.tag{font-size:11px;border-radius:4px;padding:2px 6px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.fee{font-family:var(--mono);font-size:15px;color:var(--gold)}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
+.meta dt{color:var(--muted)}
+.meta dd{margin:0}
+.links{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+.links a{border:1px solid var(--line);border-radius:5px;padding:3px 8px;text-decoration:none}
+.links a:hover{border-color:var(--ai)}
+.src{font-size:11px;color:var(--muted)}
+.src a{color:var(--muted)}
+.add{display:flex;gap:6px;margin-top:auto}
+.add select{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px}
+.onsen{color:var(--good);font-size:12px;font-weight:600}
+.warn{color:var(--warn)}
+footer ol{padding-left:20px;margin:6px 0 0;font-size:12px;display:flex;flex-direction:column;gap:3px}
+footer li{overflow-wrap:anywhere}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px}
+@media (prefers-reduced-motion:no-preference){.stop{transition:background .15s}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Nagoya · 3박 4일 · 온천 숙소</div>
+      <h1>나고야 3박4일 플래너</h1>
+      <div class="muted">요금은 2026년 10월 기준 조사값입니다. 예약 전 출처 링크에서 다시 확인하세요.</div>
+    </div>
+    <div class="controls">
+      <label class="ctl" for="startDate">출발일<input id="startDate" type="date"></label>
+      <label class="ctl" for="persons">인원(성인)<input id="persons" type="number" min="1" max="10" value="2"></label>
+      <label class="ctl" for="rateJPY">원/엔 환율<input id="rateJPY" type="number" step="0.01" value="9.3"></label>
+      <label class="ctl" for="rateUSD">원/달러 환율<input id="rateUSD" type="number" step="1" value="1400"></label>
+      <button class="btn" id="resetBtn" type="button">추천 일정으로 되돌리기</button>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="예상 비용 요약">
+    <div><span class="eyebrow">관광지 입장료</span><b class="num" id="sumSpots">-</b><span class="muted" id="sumSpotsK"></span></div>
+    <div><span class="eyebrow">숙박 3박</span><b class="num" id="sumHotel">-</b><span class="muted" id="sumHotelK"></span></div>
+    <div class="total"><span class="eyebrow">합계 (항공·교통·식비 제외)</span><b class="num" id="sumTotal">-</b><span class="muted" id="sumTotalSub"></span></div>
+    <div><span class="eyebrow">일정에 담은 장소</span><b class="num" id="sumCount">-</b><span class="muted">관광지 / 숙소 지정</span></div>
+  </section>
+
+  <div class="main">
+    <section class="panel" aria-label="지도">
+      <div class="panel-head">
+        <h2>위치 지도</h2>
+        <div class="seg" role="group" aria-label="지도 범위">
+          <button type="button" data-zoom="all" aria-pressed="true">광역 (이누야마·나가시마)</button>
+          <button type="button" data-zoom="city" aria-pressed="false">시내 중심</button>
+        </div>
+      </div>
+      <svg id="map" role="img" aria-label="관광지와 숙소 좌표 지도"></svg>
+      <div class="legend" id="legend"></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">실제 위도·경도로 배치한 좌표 지도입니다. 지점을 누르면 카드로 이동하고, 각 카드의 <b>구글지도·네이버지도</b> 버튼과 일정의 <b>경로 열기</b>로 실제 지도와 대중교통 경로를 확인할 수 있습니다.</p>
+    </section>
+
+    <section class="panel" aria-label="일정 편집">
+      <div class="panel-head">
+        <h2>일정</h2>
+        <div class="daytabs" role="tablist" id="dayTabs"></div>
+      </div>
+      <div id="dayPanel" class="dayinfo"></div>
+    </section>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div class="panel-head" style="margin:0">
+      <h2>가볼 만한 곳</h2>
+      <div class="filters" id="spotFilters"></div>
+    </div>
+    <div class="grid" id="spotGrid"></div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div class="panel-head" style="margin:0">
+      <h2>온천이 있는 숙소</h2>
+      <span class="muted" style="font-size:12px">시내 호텔은 1실 요금(2인 기준), 료칸은 1인 1박2식 요금</span>
+    </div>
+    <div class="grid" id="hotelGrid"></div>
+  </section>
+
+  <footer class="panel">
+    <h3>출처</h3>
+    <ol id="srcList"></ol>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const S = {
+  city:{t:"名古屋市 사용료 개정 안내(PDF)",u:"https://www.city.nagoya.jp/_res/projects/default_project/_page_/001/017/533/2605_shiban_05.pdf"},
+  kyodo:{t:"共同通信: 名古屋城入場料が千円に値上げ(2026.3.19)",u:"https://kumanichi.com/articles/1970693"},
+  castleFree:{t:"名古屋市 보도자료: 本丸外 무료화 실증실험(2026.10.14)",u:"https://www.city.nagoya.jp/houdou/3003942/3003949/3005916.html"},
+  ghibli:{t:"ジブリパーク 공식 티켓 안내",u:"https://ghibli-park.jp/ticket/"},
+  ghibliPdf:{t:"愛知県 지브리파크 요금표(2026년 7월 입장분~)",u:"https://www.pref.aichi.jp/uploaded/attachment/613670.pdf"},
+  aqua:{t:"Aichi Now: 名古屋港水族館 요금",u:"https://aichinow.pref.aichi.jp/spots/detail/3641"},
+  linear:{t:"Aichi Now: リニア・鉄道館 요금·휴관일",u:"https://aichinow.pref.aichi.jp/spots/detail/3654"},
+  toyota:{t:"名古屋コンシェルジュ: トヨタ産業技術記念館",u:"https://www.nagoya-info.jp/event/detail/1400/"},
+  tokugawa:{t:"まっぷる: 徳川美術館·徳川園 요금",u:"https://www.mapple.net/original/406274/"},
+  tower:{t:"るるぶ: 中部電力 MIRAI TOWER 전망대",u:"https://rurubu.jp/andmore/spot/80023567"},
+  towerTk:{t:"Boo-Woo티켓: MIRAI TOWER 예매가",u:"https://l-tike.com/bw-ticket/leisure/nagoya_tv_tower/"},
+  inuyama:{t:"Aichi Now: 国宝犬山城 요금",u:"https://aichinow.pref.aichi.jp/educations/detail/2993/"},
+  nabana:{t:"なばなの里 일루미네이션 2026-27 시기별 입촌료",u:"https://kaibutsu-blog.com/?p=3646"},
+  nabanaRail:{t:"鉄道チャンネル: なばなの里 2026-27 기간·교통",u:"https://tetsudo-ch.com/13040868.html"},
+  higashi:{t:"東山動植物園 요금 개정(PDF)",u:"https://www.higashiyama.city.nagoya.jp/news/archives/2026/03/aefbb7443ec28b3b6a64c8deb32049b0dd92b931.pdf"},
+  nagoyaEvents:{t:"名古屋観光 이벤트 안내(한국어)",u:"https://www.nagoya-info.jp/ko/wellnestyle/news/1335/"},
+  dormy:{t:"Expedia: Dormy Inn Premium Nagoya Sakae 요금 예시",u:"https://www.expedia.com/es/Shikemichi-Hoteles.0-l553248621532772837-0.Guia-Viajes-Filter-Hoteles"},
+  dormyOnsen:{t:"GLTJP: 천연온천 킨샤치노유 소개",u:"https://www.gltjp.com/en/directory/item/16433/"},
+  vessel:{t:"こころから: ベッセルホテルカンパーナ名古屋",u:"https://www.cocolocala.jp/hotels/29069"},
+  superh:{t:"Hoteles.com: SUPER HOTEL 名古屋天然温泉 新幹線口",u:"https://co.hoteles.com/de725228-ty4/con-spa-hoteles-nagoya-japon/"},
+  premier:{t:"一休: Premier Nagoya 천연온천 사쿠라도리 출구",u:"https://www.ikyu.com/en-us/00082385/"},
+  hanamizuki:{t:"JTB: ホテル花水木 요금 목록",u:"https://www.jtb.co.jp/kokunai-hotel/htl/5506004/plan/"},
+  hanamizukiKnt:{t:"近畿日本ツーリスト: ホテル花水木 시설 정보",u:"https://yado.knt.co.jp/st/S240002/"},
+  olive:{t:"近畿日本ツーリスト: ガーデンホテルオリーブ",u:"https://yado.knt.co.jp/areamap/1070303100001/1/"},
+};
+
+const SPOTS = [
+  {id:"castle",name:"나고야성",ja:"名古屋城",cat:"역사",lat:35.1856,lng:136.8990,fee:1000,cur:"JPY",feeLabel:"성인 1,000엔 · 중학생 이하 무료",
+   hours:"9:00–16:30",closed:"연말연시",dur:"2시간",desc:"금 샤치호코와 2018년 복원된 혼마루 고텐이 핵심. 천수각은 목조 복원 공사로 내부 입장 불가.",
+   tip:"2026년 10월 1일부터 500엔→1,000엔 인상. 2027년 2월 한 달은 본마루 밖 무료 실증실험 예정.",src:["city","kyodo","castleFree"]},
+  {id:"tokugawa",name:"도쿠가와 미술관·도쿠가와엔",ja:"徳川美術館",cat:"역사",lat:35.1846,lng:136.9339,fee:1900,cur:"JPY",feeLabel:"미술관 1,600엔 + 정원 300엔",
+   hours:"10:00–16:30",closed:"월요일",dur:"2시간",desc:"오와리 도쿠가와 가문 유물과 국보 겐지모노가타리 에마키 소장. 옆 도쿠가와엔은 단풍 명소.",
+   tip:"월요일 휴관. 11월 중순~하순이 정원 단풍 절정.",src:["tokugawa"]},
+  {id:"atsuta",name:"아쓰타 신궁",ja:"熱田神宮",cat:"역사",lat:35.1283,lng:136.9087,fee:0,cur:"JPY",feeLabel:"참배 무료",
+   hours:"상시 참배",closed:"없음",dur:"1시간",desc:"삼종신기 중 쿠사나기 검을 모신 신궁. 경내 숲 산책과 근처 히츠마부시 노포를 함께.",
+   tip:"메이테쓰 진구마에역·지하철 진구니시역 하차.",src:[]},
+  {id:"osu",name:"오스 상점가·오스칸논",ja:"大須商店街",cat:"쇼핑·맛집",lat:35.1594,lng:136.9010,fee:0,cur:"JPY",feeLabel:"무료",
+   hours:"점포별 대략 10:00–19:00",closed:"점포별",dur:"2시간",desc:"오스칸논 절을 중심으로 1,200여 개 점포가 모인 아케이드. 먹거리·빈티지·서브컬처 쇼핑.",
+   tip:"사카에에서 걸어서 15분, 나고야성과 같은 날 묶기 좋음.",src:[]},
+  {id:"sakae",name:"오아시스21·미라이타워",ja:"中部電力 MIRAI TOWER",cat:"야경",lat:35.1717,lng:136.9093,fee:1300,cur:"JPY",feeLabel:"전망대 성인 1,300엔(예매 1,200엔)",
+   hours:"10:00–21:00(토 21:40)",closed:"연 2일 정도 점검",dur:"1.5시간",desc:"전국 타워 최초 국가 중요문화재. 지상 90·100m 전망대와 오아시스21 '물의 우주선' 야경.",
+   tip:"오아시스21 옥상은 무료. 해 진 뒤 방문 추천.",src:["tower","towerTk"]},
+  {id:"science",name:"나고야시 과학관",ja:"名古屋市科学館",cat:"체험",lat:35.1651,lng:136.8997,fee:1000,cur:"JPY",feeLabel:"전시+플라네타리움 1,000엔",
+   hours:"9:30–17:00",closed:"월요일",dur:"2시간",desc:"세계 최대급 플라네타리움 돔. 비 오는 날 대안 일정.",
+   tip:"2026년 10월부터 800엔→1,000엔.",src:["city"]},
+  {id:"toyota",name:"도요타 산업기술기념관",ja:"トヨタ産業技術記念館",cat:"체험",lat:35.1820,lng:136.8768,fee:1000,cur:"JPY",feeLabel:"성인 1,000엔",
+   hours:"9:30–17:00",closed:"월요일",dur:"2~3시간",desc:"붉은 벽돌 방직공장을 개조한 박물관. 직기와 자동차 기술을 실연으로 보여줌.",
+   tip:"나고야역에서 가까워 마지막 날 공항 가기 전 넣기 좋음. 10/3~12/13 기획전 상설권으로 관람.",src:["toyota"]},
+  {id:"aquarium",name:"나고야항 수족관",ja:"名古屋港水族館",cat:"체험",lat:35.0907,lng:136.8786,fee:2030,cur:"JPY",feeLabel:"성인 2,030엔",
+   hours:"9:30–17:30(시즌별 상이)",closed:"월요일(공휴일 다음날)",dur:"3시간",desc:"범고래·벨루가·돌고래 퍼포먼스. 정어리 토네이도가 명물.",
+   tip:"지하철 메이코선 나고야코역 도보 5분.",src:["aqua"]},
+  {id:"linear",name:"리니어·철도관",ja:"リニア・鉄道館",cat:"체험",lat:35.0485,lng:136.8518,fee:1200,cur:"JPY",feeLabel:"성인 1,200엔",
+   hours:"10:00–17:30",closed:"화요일",dur:"2시간",desc:"초전도 리니어와 신칸센 실물 39량, 대형 철도 디오라마.",
+   tip:"아오나미선 긴조후토역 도보 2분. 화요일 휴관 주의.",src:["linear"]},
+  {id:"higashiyama",name:"히가시야마 동식물원",ja:"東山動植物園",cat:"자연",lat:35.1574,lng:136.9737,fee:800,cur:"JPY",feeLabel:"성인 800엔",
+   hours:"9:00–16:50",closed:"월요일",dur:"3시간",desc:"동물원·식물원·스카이타워가 한 곳에. 가족 여행에 적합.",
+   tip:"2026년 10월부터 500엔→800엔.",src:["higashi"]},
+  {id:"ghibli",name:"지브리 파크",ja:"ジブリパーク",cat:"테마파크",lat:35.1734,lng:137.0895,fee:7300,cur:"JPY",feeLabel:"대산포권 프리미엄 평일 7,300엔(주말 7,800) · 스탠다드 평일 3,300엔(주말 3,800)",
+   hours:"평일 10:00–17:00 / 주말 9:00–17:00",closed:"화요일 중심(공식 캘린더 확인)",dur:"하루",desc:"아이치 엑스포 기념공원 안 5개 구역. 대창고·마녀의 계곡·하울의 성 등.",
+   tip:"완전 예약제. 입장월 2개월 전 10일 14시 판매 시작이라 11~12월분은 서둘러야 함.",src:["ghibli","ghibliPdf"]},
+  {id:"inuyama",name:"국보 이누야마성",ja:"犬山城",cat:"근교",lat:35.3885,lng:136.9393,fee:1000,cur:"JPY",feeLabel:"성인 1,000엔",
+   hours:"9:00–17:00(입장 16:30)",closed:"12/29–31",dur:"반나절",desc:"현존 최고(最古)급 목조 천수를 가진 국보 5성 중 하나. 성하마을 먹거리 산책.",
+   tip:"메이테쓰 나고야역에서 이누야마역까지 약 30분.",src:["inuyama"]},
+  {id:"nabana",name:"나바나노사토 일루미네이션",ja:"なばなの里",cat:"야경",lat:35.0741,lng:136.6893,fee:2500,cur:"JPY",feeLabel:"10/17–11/20 편의점 2,500엔(현장 2,700) · 11/21–12/22 3,000엔",
+   hours:"일몰 후 점등~폐원",closed:"2027/1/6–7",dur:"3시간",desc:"200m 빛의 터널과 일본 최대급 수상 일루미네이션. 2026-27 시즌 10/17~2027/5/31.",
+   tip:"긴테쓰 나가시마역에서 직통버스 10분(250엔). 나가시마 온천 숙박과 묶으면 동선이 짧음.",src:["nabana","nabanaRail"]},
+];
+
+const HOTELS = [
+  {id:"dormy",name:"도미인 프리미엄 나고야 사카에",ja:"ドーミーイン PREMIUM 名古屋栄",area:"사카에·니시키",lat:35.1694,lng:136.9003,
+   amt:101,cur:"USD",unit:"room",priceLabel:"1실 약 US$98–111/박 (예약사이트 예시가)",
+   onsen:"천연온천 킨샤치노유 · 노천탕·사우나",desc:"사카에·후시미역 도보 4분. 야식 라멘, 명물 조식 뷔페.",src:["dormy","dormyOnsen"]},
+  {id:"vessel",name:"베셀 호텔 캄파나 나고야",ja:"ベッセルホテルカンパーナ名古屋",area:"나고야역",lat:35.1735,lng:136.8885,
+   amt:14115,cur:"JPY",unit:"room",priceLabel:"1실 14,115엔~/박 (US$89~ 예시)",
+   onsen:"대욕장·사우나",desc:"나고야역 도보 9분. 히츠마부시 나오는 조식이 인기.",src:["vessel","dormy"]},
+  {id:"premier",name:"프리미어 나고야 천연온천 사쿠라도리구치",ja:"Premier Nagoya Natural Hot Spring Sakura-dori Exit",area:"나고야역",lat:35.1745,lng:136.8905,
+   amt:101,cur:"USD",unit:"room",priceLabel:"1실 약 US$91–101/박 (예시가)",
+   onsen:"100% 천연온천(탄산수소나트륨천)",desc:"나고야역 사쿠라도리 출구 도보 7분. 무료 웰컴바.",src:["premier","superh"]},
+  {id:"superhotel",name:"슈퍼호텔 나고야 천연온천 신칸센구치",ja:"スーパーホテル名古屋天然温泉 新幹線口",area:"나고야역 서쪽",lat:35.1680,lng:136.8790,
+   amt:124,cur:"USD",unit:"room",priceLabel:"1실 약 US$113–124/박 · 조식 포함",
+   onsen:"천연온천 대욕장",desc:"신칸센 출구 쪽. 조식 포함 가성비 숙소.",src:["superh"]},
+  {id:"hanamizuki",name:"호텔 하나미즈키 (나가시마 온천)",ja:"ホテル花水木",area:"미에현 나가시마",lat:35.0315,lng:136.7335,
+   amt:44000,cur:"JPY",unit:"person",priceLabel:"1인 1박2식 44,000–63,800엔 (2인1실, JTB)",
+   onsen:"알칼리성 단순온천 '다키노유'·노천탕",desc:"나가시마 리조트 최상급 일본식 료칸. 숙박객은 스파랜드·유아미노시마·나바나노사토 입장 서비스. 입탕세 별도.",src:["hanamizuki","hanamizukiKnt"]},
+  {id:"olive",name:"가든호텔 올리브 (나가시마 온천)",ja:"ガーデンホテルオリーブ",area:"미에현 나가시마",lat:35.0328,lng:136.7318,
+   amt:17600,cur:"JPY",unit:"person",priceLabel:"1인 17,600–42,200엔 (KNT)",
+   onsen:"나가시마 온천 · 유아미노시마 입장",desc:"스파랜드 도보 2분 리조트 호텔. 화양중 100종 석식 뷔페. 숙박객 나바나노사토 입장 서비스.",src:["olive"]},
+];
+
+const DAY_COLORS = ["--d1","--d2","--d3","--d4"];
+const DEFAULT_PLAN = {
+  days:[
+    {title:"성과 사카에",spots:["castle","osu","sakae"],hotel:"dormy",note:"주부국제공항 → 메이테쓰 특급으로 나고야역 약 30분. 짐은 호텔에 맡기고 나고야성부터."},
+    {title:"지브리 파크",spots:["ghibli"],hotel:"dormy",note:"사카에에서 지하철 히가시야마선 후지가오카 → 리니모 아이치큐하쿠키넨코엔역. 티켓 예약 필수. 화요일 휴원 여부 확인."},
+    {title:"신궁·항구·온천",spots:["atsuta","aquarium","nabana"],hotel:"hanamizuki",note:"오후에 긴테쓰 나고야 → 나가시마, 또는 메이테쓰 버스센터 → 나가시마 온천 고속버스(약 50분)로 이동해 체크인. 저녁 나바나노사토 일루미네이션."},
+    {title:"산업기술과 귀국",spots:["toyota"],hotel:null,note:"아침 온천 후 나고야역 복귀(고속버스 약 50분). 도요타 기념관 관람 후 메이테쓰로 공항. 월요일이면 휴관이라 오스·메이에키 쇼핑으로 교체."},
+  ]
+};
+
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let plan, activeDay=0, zoom="all", filter="전체";
+function load(){try{const p=JSON.parse(localStorage.getItem("ngy-plan"));if(p&&p.days&&p.days.length===4)return p}catch(e){}return JSON.parse(JSON.stringify(DEFAULT_PLAN))}
+function save(){try{localStorage.setItem("ngy-plan",JSON.stringify(plan))}catch(e){}}
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem("ngy-set"));if(s){["persons","rateJPY","rateUSD","startDate"].forEach(k=>{if(s[k]!=null)$("#"+k).value=s[k]})}}catch(e){}}
+function saveSettings(){try{localStorage.setItem("ngy-set",JSON.stringify({persons:$("#persons").value,rateJPY:$("#rateJPY").value,rateUSD:$("#rateUSD").value,startDate:$("#startDate").value}))}catch(e){}}
+plan=load(); loadSettings();
+
+const spot=id=>SPOTS.find(s=>s.id===id), hotel=id=>HOTELS.find(h=>h.id===id);
+const persons=()=>Math.max(1,parseInt($("#persons").value)||1);
+const toKRW=(amt,cur)=>amt*(cur==="USD"?(+$("#rateUSD").value||0):(+$("#rateJPY").value||0));
+const toJPY=(amt,cur)=>cur==="USD"?amt*(+$("#rateUSD").value||0)/((+$("#rateJPY").value)||1):amt;
+const yen=n=>"¥"+Math.round(n).toLocaleString("ko-KR");
+const won=n=>"약 "+Math.round(n/1000).toLocaleString("ko-KR")+"천원";
+function hotelCost(h){const p=persons();return h.unit==="room"?h.amt*Math.ceil(p/2):h.amt*p}
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function dayDate(i){const v=$("#startDate").value;if(!v)return"";const d=new Date(v+"T00:00:00");d.setDate(d.getDate()+i);return (d.getMonth()+1)+"/"+d.getDate()+"("+"일월화수목금토"[d.getDay()]+")"}
+function dayOfWeek(i){const v=$("#startDate").value;if(!v)return null;const d=new Date(v+"T00:00:00");d.setDate(d.getDate()+i);return d.getDay()}
+const CLOSED_DOW={tokugawa:1,science:1,toyota:1,aquarium:1,higashiyama:1,linear:2,ghibli:2};
+
+const gmaps=q=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);
+const nmaps=q=>"https://map.naver.com/p/search/"+encodeURIComponent(q);
+const gimg=q=>"https://www.google.com/search?tbm=isch&q="+encodeURIComponent(q);
+function routeUrl(i){
+  const d=plan.days[i]; const pts=[];
+  if(i===0) pts.push("中部国際空港");
+  else{const prev=plan.days[i-1].hotel;pts.push(prev?hotel(prev).ja:"名古屋駅")}
+  d.spots.forEach(id=>pts.push(spot(id).ja));
+  pts.push(d.hotel?hotel(d.hotel).ja:(i===3?"中部国際空港":"名古屋駅"));
+  const o=pts[0],de=pts[pts.length-1],w=pts.slice(1,-1);
+  return "https://www.google.com/maps/dir/?api=1&travelmode=transit&origin="+encodeURIComponent(o)+"&destination="+encodeURIComponent(de)+(w.length?"&waypoints="+encodeURIComponent(w.join("|")):"");
+}
+
+/* ---- map ---- */
+const B={lat0:35.015,lat1:35.405,lng0:136.66,lng1:137.115}, K=Math.cos(35.2*Math.PI/180);
+const H=1000, W=Math.round((B.lng1-B.lng0)*K/(B.lat1-B.lat0)*H);
+const px=(lat,lng)=>[(lng-B.lng0)*K/(B.lat1-B.lat0)*H,(B.lat1-lat)/(B.lat1-B.lat0)*H];
+function viewBox(){
+  if(zoom==="all")return [0,0,W,H];
+  const [x0,y0]=px(35.198,136.865),[x1,y1]=px(35.122,136.945);return [x0,y0,x1-x0,y1-y0];
+}
+function renderMap(){
+  const vb=viewBox(), fs=vb[2]/48, r=vb[2]/90, svg=$("#map");
+  svg.setAttribute("viewBox",vb.join(" "));
+  const ink=cssVar("--ink"),muted=cssVar("--muted"),line=cssVar("--line"),surf=cssVar("--surface"),gold=cssVar("--gold");
+  let g="";
+  // grid
+  for(let la=35.05;la<35.41;la+=0.05){const[,y]=px(la,136.7);g+=`<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="${line}" stroke-width="${vb[2]/700}"/><text x="${vb[0]+fs*.3}" y="${y-fs*.25}" font-size="${fs*.6}" fill="${muted}" font-family="IBM Plex Mono">${la.toFixed(2)}°N</text>`}
+  for(let lo=136.7;lo<137.12;lo+=0.05){const[x]=px(35.2,lo);g+=`<line y1="0" y2="${H}" x1="${x}" x2="${x}" stroke="${line}" stroke-width="${vb[2]/700}"/><text x="${x+fs*.2}" y="${vb[1]+vb[3]-fs*.3}" font-size="${fs*.6}" fill="${muted}" font-family="IBM Plex Mono">${lo.toFixed(2)}°E</text>`}
+  // hubs
+  [["나고야역",35.1709,136.8815],["사카에",35.1704,136.9086],["긴테쓰 나가시마역",35.0870,136.6987],["메이테쓰 이누야마역",35.3787,136.9445]].forEach(([n,la,lo])=>{const[x,y]=px(la,lo);g+=`<rect x="${x-r*.7}" y="${y-r*.7}" width="${r*1.4}" height="${r*1.4}" fill="${muted}" transform="rotate(45 ${x} ${y})"/><text x="${x+r*1.2}" y="${y+fs*.35}" font-size="${fs*.75}" fill="${muted}">${n}</text>`});
+  // routes
+  plan.days.forEach((d,i)=>{
+    const pts=[];
+    if(i>0&&plan.days[i-1].hotel){const h=hotel(plan.days[i-1].hotel);pts.push(px(h.lat,h.lng))}
+    d.spots.forEach(id=>{const s=spot(id);pts.push(px(s.lat,s.lng))});
+    if(d.hotel){const h=hotel(d.hotel);pts.push(px(h.lat,h.lng))}
+    if(pts.length>1){const c=cssVar(DAY_COLORS[i]);g+=`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${vb[2]/(i===activeDay?160:320)}" stroke-dasharray="${i===activeDay?"none":vb[2]/90+" "+vb[2]/140}" stroke-linejoin="round" stroke-linecap="round" opacity="${i===activeDay?1:.55}"/>`}
+  });
+  // hotels
+  HOTELS.forEach(h=>{const[x,y]=px(h.lat,h.lng);const used=plan.days.some(d=>d.hotel===h.id);
+    g+=`<g class="pt" data-kind="hotel" data-id="${h.id}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(h.name)}"><rect x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="${r*.3}" fill="${used?gold:surf}" stroke="${gold}" stroke-width="${r*.3}"/><text x="${x}" y="${y+r*.45}" text-anchor="middle" font-size="${r*1.2}" fill="${used?surf:gold}">♨</text>${zoom==="city"||used?`<text x="${x+r*1.4}" y="${y-r*.4}" font-size="${fs*.7}" fill="${gold}" font-weight="600">${esc(h.name.split(" (")[0])}</text>`:""}</g>`});
+  // spots
+  SPOTS.forEach(s=>{const[x,y]=px(s.lat,s.lng);let di=-1,ord=0;plan.days.forEach((d,i)=>{const k=d.spots.indexOf(s.id);if(k>-1&&di<0){di=i;ord=k+1}});
+    const c=di>-1?cssVar(DAY_COLORS[di]):surf;
+    g+=`<g class="pt" data-kind="spot" data-id="${s.id}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(s.name)}"><circle cx="${x}" cy="${y}" r="${r}" fill="${c}" stroke="${di>-1?c:ink}" stroke-width="${r*.25}"/>${di>-1?`<text x="${x}" y="${y+r*.4}" text-anchor="middle" font-size="${r*1.1}" fill="${surf}" font-weight="600">${ord}</text>`:""}<text x="${x+r*1.4}" y="${y+fs*.35}" font-size="${fs*.8}" fill="${ink}" font-weight="${di>-1?600:400}" paint-order="stroke" stroke="${cssVar("--bg")}" stroke-width="${fs*.25}">${esc(s.name)}</text></g>`});
+  svg.innerHTML=g;
+  svg.querySelectorAll(".pt").forEach(el=>{const go=()=>{const t=document.getElementById((el.dataset.kind==="hotel"?"h-":"s-")+el.dataset.id);if(t){t.scrollIntoView({behavior:"smooth",block:"center"});t.classList.add("sel");setTimeout(()=>t.classList.remove("sel"),1600)}};el.addEventListener("click",go);el.addEventListener("keydown",e=>{if(e.key==="Enter")go()})});
+  $("#legend").innerHTML=plan.days.map((d,i)=>`<span><i class="sw" style="background:var(${DAY_COLORS[i]})"></i>Day ${i+1}</span>`).join("")+`<span><i class="dot" style="border:2px solid var(--gold)"></i>온천 숙소</span><span><i class="dot" style="border:2px solid var(--ink)"></i>일정에 없는 곳</span><span><i class="dot" style="background:var(--muted);border-radius:1px;transform:rotate(45deg) scale(.8)"></i>주요 역</span>`;
+}
+
+/* ---- day panel ---- */
+function renderTabs(){
+  $("#dayTabs").innerHTML=plan.days.map((d,i)=>`<button type="button" role="tab" aria-selected="${i===activeDay}" data-day="${i}" style="color:var(${DAY_COLORS[i]})"><i class="dot" style="background:var(${DAY_COLORS[i]})"></i><span style="color:var(--ink)">Day ${i+1}${dayDate(i)?" · "+dayDate(i):""}</span></button>`).join("");
+  $("#dayTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{activeDay=+b.dataset.day;renderAll()});
+}
+function renderDay(){
+  const i=activeDay,d=plan.days[i],c=`var(${DAY_COLORS[i]})`,dow=dayOfWeek(i);
+  const warns=d.spots.filter(id=>dow!=null&&CLOSED_DOW[id]===dow).map(id=>spot(id).name);
+  const feeSum=d.spots.reduce((a,id)=>a+spot(id).fee,0)*persons();
+  const h=d.hotel?hotel(d.hotel):null;
+  const unused=SPOTS.filter(s=>!d.spots.includes(s.id));
+  $("#dayPanel").innerHTML=`
+    <div class="row" style="justify-content:space-between"><h3>Day ${i+1} · ${esc(d.title)}</h3><a class="btn primary" style="text-decoration:none" href="${routeUrl(i)}" target="_blank" rel="noopener">구글지도 대중교통 경로 열기 ↗</a></div>
+    ${warns.length?`<div class="note warn">선택한 날짜에 휴관일 가능성: <b>${warns.map(esc).join(", ")}</b>. 다른 날로 옮기거나 공식 사이트에서 확인하세요.</div>`:""}
+    <ol class="stops">${d.spots.length?d.spots.map((id,k)=>{const s=spot(id);return `<li class="stop"><span class="n" style="background:${c}">${k+1}</span><span class="t"><b>${esc(s.name)}</b><small>${esc(s.dur)} · ${s.fee?yen(s.fee)+"/인":"무료"} · 휴무 ${esc(s.closed)}</small></span><span class="acts"><button type="button" data-act="up" data-k="${k}" aria-label="위로">↑</button><button type="button" data-act="down" data-k="${k}" aria-label="아래로">↓</button><button type="button" data-act="del" data-k="${k}" aria-label="빼기">✕</button></span></li>`}).join(""):`<li class="empty">아래 목록이나 관광지 카드에서 장소를 추가하세요.</li>`}</ol>
+    <div class="row"><label for="addSel" class="muted" style="font-size:12px">장소 추가</label><select id="addSel"><option value="">— 관광지 선택 —</option>${unused.map(s=>`<option value="${s.id}">${esc(s.name)} (${s.fee?yen(s.fee):"무료"})</option>`).join("")}</select></div>
+    <div class="row"><label for="hotelSel" class="muted" style="font-size:12px">${i<3?`${i+1}박째 숙소`:"마지막 날"}</label>${i<3?`<select id="hotelSel"><option value="">— 숙소 미정 —</option>${HOTELS.map(x=>`<option value="${x.id}" ${x.id===d.hotel?"selected":""}>${esc(x.name)}</option>`).join("")}</select>`:`<span class="muted">숙박 없음 · 귀국</span>`}</div>
+    ${h?`<div class="muted" style="font-size:12px">♨ ${esc(h.onsen)} · ${esc(h.priceLabel)}</div>`:""}
+    <div class="note">${esc(d.note)}</div>
+    <div class="daycost"><span>이날 입장료 (${persons()}인)</span><b class="num">${yen(feeSum)} · ${won(toKRW(feeSum,"JPY"))}</b></div>
+    ${h?`<div class="daycost" style="border:0;padding:0"><span>이날 숙박</span><b class="num">${h.cur==="USD"?"US$"+Math.round(hotelCost(h)):yen(hotelCost(h))} · ${won(toKRW(hotelCost(h),h.cur))}</b></div>`:""}`;
+  $("#dayPanel").querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{const k=+b.dataset.k,a=d.spots;if(b.dataset.act==="del")a.splice(k,1);else{const j=b.dataset.act==="up"?k-1:k+1;if(j<0||j>=a.length)return;[a[k],a[j]]=[a[j],a[k]]}save();renderAll()});
+  $("#addSel").onchange=e=>{if(e.target.value){addSpot(e.target.value,i)}};
+  const hs=$("#hotelSel");if(hs)hs.onchange=e=>{d.hotel=e.target.value||null;save();renderAll()};
+}
+function addSpot(id,i){plan.days.forEach(d=>{const k=d.spots.indexOf(id);if(k>-1)d.spots.splice(k,1)});plan.days[i].spots.push(id);save();renderAll();toast(`${spot(id).name} → Day ${i+1}에 추가했습니다`)}
+function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,1800)}
+
+/* ---- cards ---- */
+function srcHtml(keys){return keys.length?`<div class="src">출처: ${keys.map(k=>`<a href="${S[k].u}" target="_blank" rel="noopener">${esc(S[k].t)}</a>`).join(" · ")}</div>`:`<div class="src">요금 출처 없음 · 공식 사이트에서 확인</div>`}
+function dayOf(id){return plan.days.findIndex(d=>d.spots.includes(id))}
+function renderSpots(){
+  const cats=["전체",...new Set(SPOTS.map(s=>s.cat))];
+  $("#spotFilters").innerHTML=cats.map(c=>`<button type="button" class="chip" aria-pressed="${c===filter}" data-c="${c}">${c}</button>`).join("");
+  $("#spotFilters").querySelectorAll("button").forEach(b=>b.onclick=()=>{filter=b.dataset.c;renderSpots()});
+  $("#spotGrid").innerHTML=SPOTS.filter(s=>filter==="전체"||s.cat===filter).map(s=>{const di=dayOf(s.id);return `
+  <article class="card" id="s-${s.id}">
+    <div class="card-top"><div><h3>${esc(s.name)}</h3><div class="ja">${esc(s.ja)}</div></div><span class="tag" ${di>-1?`style="color:var(${DAY_COLORS[di]});background:transparent;border:1px solid currentColor"`:""}>${di>-1?"Day "+(di+1):esc(s.cat)}</span></div>
+    <div class="fee">${s.fee?yen(s.fee):"무료"} <span class="muted" style="font-family:var(--body);font-size:12px">${esc(s.feeLabel)}</span></div>
+    <p style="margin:0">${esc(s.desc)}</p>
+    <dl class="meta"><dt>시간</dt><dd>${esc(s.hours)}</dd><dt>휴무</dt><dd>${esc(s.closed)}</dd><dt>소요</dt><dd>${esc(s.dur)}</dd><dt>팁</dt><dd>${esc(s.tip)}</dd></dl>
+    <div class="links"><a href="${gmaps(s.ja)}" target="_blank" rel="noopener">구글지도</a><a href="${nmaps(s.ja)}" target="_blank" rel="noopener">네이버지도</a><a href="${gimg(s.ja)}" target="_blank" rel="noopener">사진 보기</a></div>
+    ${srcHtml(s.src)}
+    <div class="add"><select aria-label="${esc(s.name)} 일정 지정" data-id="${s.id}"><option value="">${di>-1?"Day "+(di+1)+"에 있음 · 옮기기":"일정에 추가"}</option>${plan.days.map((d,i)=>`<option value="${i}">Day ${i+1} · ${esc(d.title)}</option>`).join("")}${di>-1?`<option value="x">일정에서 빼기</option>`:""}</select></div>
+  </article>`}).join("");
+  $("#spotGrid").querySelectorAll("select").forEach(sel=>sel.onchange=()=>{const id=sel.dataset.id,v=sel.value;if(v==="x"){plan.days.forEach(d=>{const k=d.spots.indexOf(id);if(k>-1)d.spots.splice(k,1)});save();renderAll()}else if(v!=="")addSpot(id,+v)});
+}
+function renderHotels(){
+  $("#hotelGrid").innerHTML=HOTELS.map(h=>{const nights=plan.days.map((d,i)=>d.hotel===h.id?i+1:0).filter(Boolean);return `
+  <article class="card ${nights.length?"":""}" id="h-${h.id}">
+    <div class="card-top"><div><h3>${esc(h.name)}</h3><div class="ja">${esc(h.ja)} · ${esc(h.area)}</div></div>${nights.length?`<span class="tag" style="color:var(--gold);border:1px solid var(--gold);background:transparent">${nights.join("·")}박째</span>`:""}</div>
+    <div class="onsen">♨ ${esc(h.onsen)}</div>
+    <div class="fee">${h.cur==="USD"?"US$"+h.amt:yen(h.amt)} <span class="muted" style="font-family:var(--body);font-size:12px">${esc(h.priceLabel)}</span></div>
+    <p style="margin:0">${esc(h.desc)}</p>
+    <div class="links"><a href="${gmaps(h.ja)}" target="_blank" rel="noopener">구글지도</a><a href="${nmaps(h.ja)}" target="_blank" rel="noopener">네이버지도</a><a href="${gimg(h.ja+" 温泉")}" target="_blank" rel="noopener">사진 보기</a></div>
+    ${srcHtml(h.src)}
+    <div class="add"><select aria-label="${esc(h.name)} 숙박일 지정" data-id="${h.id}"><option value="">숙박일로 지정</option>${[0,1,2].map(i=>`<option value="${i}">${i+1}박째 (Day ${i+1} 밤)</option>`).join("")}</select></div>
+  </article>`}).join("");
+  $("#hotelGrid").querySelectorAll("select").forEach(sel=>sel.onchange=()=>{if(sel.value==="")return;plan.days[+sel.value].hotel=sel.dataset.id;save();renderAll();toast(`${+sel.value+1}박째 숙소: ${hotel(sel.dataset.id).name}`)});
+}
+function renderSummary(){
+  const p=persons();
+  const fees=plan.days.reduce((a,d)=>a+d.spots.reduce((b,id)=>b+spot(id).fee,0),0)*p;
+  let hJPY=0,hKRW=0,set=0;
+  plan.days.slice(0,3).forEach(d=>{if(d.hotel){const h=hotel(d.hotel),c=hotelCost(h);hJPY+=toJPY(c,h.cur);hKRW+=toKRW(c,h.cur);set++}});
+  $("#sumSpots").textContent=yen(fees);$("#sumSpotsK").textContent=won(toKRW(fees,"JPY"))+` · ${p}인`;
+  $("#sumHotel").textContent=yen(hJPY);$("#sumHotelK").textContent=won(hKRW)+` · ${set}/3박 지정`;
+  $("#sumTotal").textContent=yen(fees+hJPY);$("#sumTotalSub").textContent=won(toKRW(fees,"JPY")+hKRW)+" · 달러 요금은 환율로 엔 환산";
+  $("#sumCount").textContent=plan.days.reduce((a,d)=>a+d.spots.length,0)+" / "+set+"박";
+}
+function renderSources(){$("#srcList").innerHTML=Object.values(S).map(s=>`<li><a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a></li>`).join("")}
+function renderAll(){renderTabs();renderDay();renderMap();renderSpots();renderHotels();renderSummary()}
+
+document.querySelectorAll("[data-zoom]").forEach(b=>b.onclick=()=>{zoom=b.dataset.zoom;document.querySelectorAll("[data-zoom]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderMap()});
+["persons","rateJPY","rateUSD","startDate"].forEach(id=>$("#"+id).addEventListener("input",()=>{saveSettings();renderAll()}));
+$("#resetBtn").onclick=()=>{plan=JSON.parse(JSON.stringify(DEFAULT_PLAN));save();renderAll();toast("추천 일정으로 되돌렸습니다")};
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",renderMap)}catch(e){}
+new MutationObserver(renderMap).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+renderSources();renderAll();
+</script>
+
+</html>
